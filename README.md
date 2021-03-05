@@ -1,2 +1,2 @@
 # SeniorDesign
-Senior Design project for UCF Sprint 2021
+Senior Design project for UCF Spring 2021
