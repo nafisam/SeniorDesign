@@ -8,22 +8,28 @@ SoftwareSerial bluetoothModule(BLUETOOTH_TX, BLUETOOTH_RX);
 bool car_enabled = true;
 
 // Speed values
-signed int ReveseSpeed = 0;
-signed int ForwardSpeed = 0;
+signed int Motor1_ForwardSpeed = 0;
+signed int Motor2_ForwardSpeed = 0;
+signed int Motor1_ReverseSpeed = 0;
+signed int Motor2_ReverseSpeed = 0;
+signed int Left_Turn = 0;
+signed int Right_Turn = 0;
 
-// Bluetooth inputs will come suddenly and infrequently, and we don't want to suddently jolt the car
-// Instead of sending data constantly we will get a single command and repeat it so many times
-int BL_ForwCount = 0;
-int BL_RevCount = 0;
+// Turning values
+int TurningTalue = 0;
 
 //Define functions
 bool SensorsDetectWall(int trigPin, int echoPin);
 bool BluetoothControls();
 void ReadJoystick();
+void ReadButton();
 void SetMotorForwardSpeed(bool forward);
-void SetMotorReveseSpeed(bool reverse);
+void SetMotorReverseSpeed(bool reverse);
 void SetMotorIdle();
 bool SetMotorTurning();
+void SetMotorForwardIdle();
+void SetMotorReverseIdle();
+bool SensorsTurn(int trigPin, int echoPin);
 
 //boolean variables for distance sensors
 bool LeftSensor = false;
@@ -31,9 +37,14 @@ bool CenterSensor = false;
 bool RightSensor = false;
 bool BackSensor = false;
 
-//boolean variables for moving forward
-bool forwardAllowed = true;
-bool reverseAllowed = true;
+//variable to check if the kid moved the joystick 0 -no, 1-left, 2-right
+int did_child_turn = 0;
+
+bool forwardAllow = true;
+bool reverseAllow = true;
+bool leftAllow = true;
+bool rightAllow = true;
+
 void setup() {
     // put your setup code here, to run once:
     Serial.begin(9600);
@@ -44,8 +55,10 @@ void setup() {
     pinMode(MOTOR1_PWM_CCW, OUTPUT);
     pinMode(MOTOR2_PWM_CW, OUTPUT);
     pinMode(MOTOR2_PWM_CCW, OUTPUT);
-    pinMode(STEPPER_PWM_CW, OUTPUT);
-    pinMode(STEPPER_PWM_CCW, OUTPUT);
+    pinMode(STEERING_MOTOR_CW, OUTPUT);
+    pinMode(STEERING_MOTOR_CCW, OUTPUT);
+    //pinMode(STEPPER_DIR, OUTPUT);
+    //pinMode(STEPPER_PUL, OUTPUT);
    
     //Setup the Sensor echo pins as input and the triggers as output
     pinMode(SENSOR0_ECHO, INPUT);
@@ -63,81 +76,82 @@ void setup() {
     
     //Setup the button;
     pinMode(BUTTON, OUTPUT); // Generally, in push-button we take INPUT as a parameter but here we take OUTPUT because ANALOG PIN 
-
     digitalWrite(BUTTON, HIGH); // Make button condition HIGH
-
-
   
     Serial.println("App Started");
   
     //When it comes to the bluetooth this is going to be the biggest hickup
     //Depending on the module that is used this can be any baud rate
     //This was the baud rate for my Module, but their's might be 9600
-    bluetoothModule.begin(115200);
+    bluetoothModule.begin(9600);
 }
 
 void loop() {
-
     // If the car is disabled, check for input from bluetooth and loop again
     if(!car_enabled)
     {
+        Serial.println("Car disabled");
         SetMotorIdle();
         BluetoothControls();
         delayMicroseconds(100);
-        
         return;
     }
     //Check sensors, if we are approaching a wall stop
-    LeftSensor = SensorsDetectWall(SENSOR0_TRIG, SENSOR0_ECHO);
-    //CenterSensor = SensorsDetectWall(SENSOR1_TRIG, SENSOR1_ECHO);
-   // RightSensor = SensorsDetectWall(SENSOR2_TRIG, SENSOR2_ECHO);
-   // BackSensor = SensorsDetectWall(SENSOR3_TRIG, SENSOR3_ECHO);
+    LeftSensor = SensorsDetectWall(SENSOR2_TRIG, SENSOR2_ECHO);
+    CenterSensor = SensorsDetectWall(SENSOR0_TRIG, SENSOR0_ECHO);
+    RightSensor = SensorsDetectWall(SENSOR1_TRIG, SENSOR1_ECHO);
+   // bool RightSensorTurn = SensorsTurn(SENSOR2_TRIG, SENSOR2_ECHO);
+  //  bool LeftSensorTurn = SensorsTurn(SENSOR0_TRIG, SENSOR0_ECHO);
 
-    forwardAllowed = true;
-    reverseAllowed = true;
-    if(LeftSensor)
+    leftAllow = true;
+    rightAllow = true;
+    forwardAllow = true;
+    reverseAllow = true;
+    if(CenterSensor) //obstacle in front of car
     {
-      forwardAllowed = false;
-      SetMotorForwardIdle();
-      //return;
-    }
-   /* if(CenterSensor)
-    {
-      SetMotorIdle();
-      return;
-    }
-    if(RightSensor)
-    {
-      SetMotorIdle();
-      return;
-    }*/
+      forwardAllow = false;
+      leftAllow = false;
+      rightAllow = false;
+      bluetoothCmd parentData = (bluetoothCmd)bluetoothModule.read();
+      if(!LeftSensor) //left side of car is free
+      {
+        Serial.println("entering first if statment");
+        if (parentData == Left)
+        {
+          forwardAllow = true;
+          leftAllow = true;
+          Serial.println("Let's move left");
+        }
+      }
+
+       if(!RightSensor) //right side of car is free
+      {
+        if (parentData == Right)
+        {
+        forwardAllow = true;
+        rightAllow = true;
+        Serial.println("Let's move right");
+      }
+
+      if((!leftAllow) && (!rightAllow))
+      {
+          SetMotorForwardIdle();
+      }
+    } //end sensor if
+
 
     // Attempt to read in values from bluetooth
-    BluetoothControls();
-
-    if(BL_ForwCount > 0)
+    // If we get nothing from bluetooth use the joystick/button as input
+    if( !BluetoothControls() )
     {
-        Serial.println("Bluetooth: ForwardSpeed");
-        BL_ForwCount--;   
-        SetMotorForwardSpeed(forwardAllowed);
-    }
-    else if (BL_RevCount > 0)
-    {
-        Serial.println("Bluetooth: ReveseSpeed");
-        BL_RevCount--;
-        SetMotorReveseSpeed(reverseAllowed);
-    }
-    // Read from joystick if nothing else has stopped us
-    else
-    {
-        //Serial.println("Reading Joysticks");
+        Serial.println("Reading Analog Input");
         //ReadJoystick();
-        Serial.println("Reading Button");
         ReadButton();
     }
     
     // Let everything breath for a moment
-    //delayMicroseconds(50);
+    delayMicroseconds(50);
+}
 }
 
 
@@ -149,18 +163,52 @@ bool SensorsDetectWall(int trigPin, int echoPin)
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(trigPin, HIGH);
-    delayMicroseconds(2);
+    delayMicroseconds(5);
     digitalWrite(trigPin, LOW);
-    duration = pulseIn(echoPin, HIGH);
+    duration = pulseIn(echoPin, HIGH,20000);
     sensorDistance = (duration * .0343)/2;
     Serial.print("Distance: ");
     Serial.println(sensorDistance);
-    if (sensorDistance < Distance)
+    if (sensorDistance < DISTANCE)
     {
+      if(sensorDistance == 0){
+        return false;
+      }
+      else{
         return true;
+      }
     }
     return false;
 }
+
+
+//if the car is stopped, and we need to turn left or right check if les than 150
+//if greater than 150, return true (meaning the car can make the zero radius turn)
+bool SensorsTurn(int trigPin, int echoPin)
+{
+    float duration, sensorDistance;
+    
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(trigPin, LOW);
+    duration = pulseIn(echoPin, HIGH,20000);
+    sensorDistance = (duration * .0343)/2;
+    Serial.print("Distance: ");
+    Serial.println(sensorDistance);
+    if (sensorDistance < CAR_LENGTH)
+    {
+      if(sensorDistance == 0){
+        return true;
+      }
+      else{
+        return false;
+      }
+    }
+    return true;
+}
+//148 cm
 
 // Read in the bluetooth commands and set the bluetooth values as needed
 bool BluetoothControls()
@@ -169,39 +217,34 @@ bool BluetoothControls()
     {
         // Read in the command from bluetooth and process the command
         bluetoothCmd data = (bluetoothCmd)bluetoothModule.read();
+        Serial.print("Bluetooth data:");
+        Serial.println((char)data);
         switch(data)
         {
-            // For both ForwardSpeed and ReveseSpeed we are pulsing the car
+            // For both ForwardSpeed and ReverseSpeed we are pulsing the car
             // This is in case data is not constantly coming in
             case Forward:
-                BL_ForwCount = 15;
-                BL_RevCount = 0;
-                break;
+                SetMotorForwardSpeed(forwardAllow);
+                return true;
             case Backward:
-                BL_RevCount = 15;
-                BL_ForwCount = 0;
-                break;
+                SetMotorReverseSpeed(reverseAllow);
+                return true;
             case Left:
                 SetMotorTurning(LeftCmd);
-                break;
+                return true;
             case Right:
                 SetMotorTurning(RightCmd);
-                break;
+                return true;
             case Stop:
                 car_enabled = false;
-                BL_ForwCount = 0;
-                BL_RevCount = 0;
-                break;
+                return true;
             case Start:
                 car_enabled = true;
-                BL_ForwCount = 0;
-                BL_RevCount = 0;
-                break;
+                return true;
             default:
                 // Do nothing, garbage data
-                break;
+                return false;
         }
-        return true;
     }
     return false; 
 }
@@ -211,23 +254,57 @@ void ReadJoystick()
 {
     int Joystick_xPos = analogRead(JOYSTICK_XPOS);
     int Joystick_yPos = analogRead(JOYSTICK_YPOS);
+    bool changedForward = false;
+    bool changedReverse = false;
+    Serial.print("x pos: ");
+    Serial.println(Joystick_xPos);
+    Serial.print("y pos: ");
+    Serial.println(Joystick_yPos);
 
     // ForwardSpeed & Reverse
     if(Joystick_yPos > JOYSTICK_HIGH_THRES)
-        SetMotorForwardSpeed(forwardAllowed);
+        SetMotorForwardSpeed(forwardAllow);
     else if(Joystick_yPos < JOYSTICK_LOW_THRES)
-        SetMotorReveseSpeed(reverseAllowed);
+        SetMotorReverseSpeed(reverseAllow);
     else
-        SetMotorIdle();
+        changedForward = true;
 
     // Turning 
-    if(Joystick_yPos < JOYSTICK_TURN_LEFT)
+    if(Joystick_xPos < JOYSTICK_TURN_LEFT)
     {
-      
+        SetMotorTurning(LeftCmd);
     }
-    else if(Joystick_yPos > JOYSTICK_TURN_RIGHT)
+    else if(Joystick_xPos > JOYSTICK_TURN_RIGHT)
     {
-      
+        SetMotorTurning(RightCmd);
+    }
+    else
+      changedReverse = true;
+
+    if(changedForward && changedReverse)
+    {
+      SetMotorIdle();;
+    }
+}
+
+// Read in the joystick values to see if we turned right or left
+int ReadJoystickTurn()
+{
+    int Joystick_xPos = analogRead(JOYSTICK_XPOS);
+    int Joystick_yPos = analogRead(JOYSTICK_YPOS);
+
+    // Turning 
+    if(Joystick_xPos < JOYSTICK_TURN_LEFT)
+    {
+      return 1;
+    }
+    else if(Joystick_xPos > JOYSTICK_TURN_RIGHT)
+    {
+      return 2;
+    }
+    else
+    {
+      return 0;
     }
 }
 
@@ -236,7 +313,7 @@ void ReadButton()
 {
     if(digitalRead(BUTTON) == LOW)  // If button pressed
     {
-      SetMotorForwardSpeed(forwardAllowed);
+      SetMotorForwardSpeed(forwardAllow);
     }
     else
     {
@@ -244,45 +321,46 @@ void ReadButton()
     }
 }
 
-// Increase the ForwardSpeed speed of both of the motors and decrease their ReveseSpeed speed
+// Increase the ForwardSpeed speed of both of the motors and decrease their ReverseSpeed speed
 void SetMotorForwardSpeed(bool forward)
 {
-  if (!forward)
+    if(!forward)
   {
-    Serial.println("Can't move forward");
-    return;
+    Serial.println("can't move forward");
   }
-  else
-  {
-    Serial.println("Forwarding");
-    ForwardSpeed = lim_min(MaxSpeed, ForwardSpeed+Accleration);
-    ReveseSpeed = lim_max(0, ReveseSpeed-Deccleration);
 
-    analogWrite(MOTOR1_PWM_CW, ForwardSpeed);
-    analogWrite(MOTOR1_PWM_CCW, ReveseSpeed);
-    analogWrite(MOTOR2_PWM_CW, ReveseSpeed);
-    analogWrite(MOTOR2_PWM_CCW, ForwardSpeed);
+  else{
+    Serial.println("Forwarding");
+    Motor1_ForwardSpeed = lim_min(MaxSpeed, Motor1_ForwardSpeed+Accleration);
+    Motor2_ForwardSpeed = lim_min(MaxSpeed, Motor2_ForwardSpeed+Accleration);
+    Motor1_ReverseSpeed = lim_max(0, Motor1_ReverseSpeed-Deccleration);
+    Motor2_ReverseSpeed = lim_max(0, Motor2_ReverseSpeed-Deccleration);
+
+    analogWrite(MOTOR1_PWM_CW, Motor1_ForwardSpeed);
+    analogWrite(MOTOR1_PWM_CCW, Motor1_ReverseSpeed);
+    analogWrite(MOTOR2_PWM_CW, Motor2_ReverseSpeed);
+    analogWrite(MOTOR2_PWM_CCW, Motor2_ForwardSpeed);
   }
 }
 
-// Increase the ReveseSpeed speed of both of the motors and decrease their ForwardSpeed speed
-void SetMotorReveseSpeed(bool reverse)
+// Increase the ReverseSpeed speed of both of the motors and decrease their ForwardSpeed speed
+void SetMotorReverseSpeed(bool reverse)
 {
-  if (!reverse)
+    if(!reverse)
   {
-    Serial.println("Can't move reverse");
     return;
   }
   else{
-   
     Serial.println("Reversing");
-    ReveseSpeed = lim_min(MaxSpeed, ReveseSpeed+Accleration);
-    ForwardSpeed = lim_max(0, ForwardSpeed-Deccleration);
+    Motor1_ReverseSpeed = lim_min(MaxSpeed, Motor1_ReverseSpeed+Accleration);
+    Motor2_ReverseSpeed = lim_min(MaxSpeed, Motor2_ReverseSpeed+Accleration);
+    Motor1_ForwardSpeed = lim_max(0, Motor1_ForwardSpeed-Deccleration);
+    Motor2_ForwardSpeed = lim_max(0, Motor2_ForwardSpeed-Deccleration);
     
-    analogWrite(MOTOR1_PWM_CW, ForwardSpeed);
-    analogWrite(MOTOR1_PWM_CCW, ReveseSpeed);
-    analogWrite(MOTOR2_PWM_CW, ReveseSpeed);
-    analogWrite(MOTOR2_PWM_CCW, ForwardSpeed);
+    analogWrite(MOTOR1_PWM_CW, Motor1_ForwardSpeed);
+    analogWrite(MOTOR1_PWM_CCW, Motor1_ReverseSpeed);
+    analogWrite(MOTOR2_PWM_CW, Motor2_ReverseSpeed);
+    analogWrite(MOTOR2_PWM_CCW, Motor2_ForwardSpeed);
   }
 }
 
@@ -290,41 +368,85 @@ void SetMotorReveseSpeed(bool reverse)
 void SetMotorIdle()
 {
     Serial.println("Motor idling");
-    ForwardSpeed = lim_max(0, (ForwardSpeed-Deccleration));
-    ReveseSpeed = lim_max(0, (ReveseSpeed-Deccleration));
+    Motor1_ForwardSpeed = lim_max(0, (Motor1_ForwardSpeed-Deccleration));
+    Motor2_ForwardSpeed = lim_max(0, (Motor2_ForwardSpeed-Deccleration));
+    Motor1_ReverseSpeed = lim_max(0, (Motor1_ReverseSpeed-Deccleration));
+    Motor2_ReverseSpeed = lim_max(0, (Motor2_ReverseSpeed-Deccleration));
 
-    analogWrite(MOTOR1_PWM_CW, ForwardSpeed);
-    analogWrite(MOTOR2_PWM_CCW, ForwardSpeed);   
-    analogWrite(MOTOR2_PWM_CW, ReveseSpeed);
-    analogWrite(MOTOR1_PWM_CCW, ReveseSpeed);
+    analogWrite(MOTOR1_PWM_CW, Motor1_ForwardSpeed);
+    analogWrite(MOTOR2_PWM_CCW, Motor2_ForwardSpeed);   
+    analogWrite(MOTOR2_PWM_CW, Motor2_ReverseSpeed);
+    analogWrite(MOTOR1_PWM_CCW, Motor1_ReverseSpeed);
 }
 
-// Slowly break the motors, this prevents sudden breaking
+// Slowly break the motor, this prevents sudden breaking
 void SetMotorForwardIdle()
 {
-   // Serial.println("Motor idling");
-   ForwardSpeed = lim_max(0, (ForwardSpeed-Deccleration));
+    // Serial.println("Motor idling");
+    Motor1_ForwardSpeed = lim_max(0, (Motor1_ForwardSpeed-Deccleration));
+    Motor2_ForwardSpeed = lim_max(0, (Motor2_ForwardSpeed-Deccleration));
     //ReveseSpeed = lim_max(0, (ReveseSpeed-Deccleration));
 
-    analogWrite(MOTOR1_PWM_CW, ForwardSpeed);
-    analogWrite(MOTOR2_PWM_CCW, ForwardSpeed);   
-  //  analogWrite(MOTOR2_PWM_CW, ReveseSpeed);
-  //  analogWrite(MOTOR1_PWM_CCW, ReveseSpeed);
+    analogWrite(MOTOR1_PWM_CW, Motor1_ForwardSpeed);
+    analogWrite(MOTOR2_PWM_CCW, Motor2_ForwardSpeed);   
+    //  analogWrite(MOTOR2_PWM_CW, ReveseSpeed);
+    //  analogWrite(MOTOR1_PWM_CCW, ReveseSpeed);
+}
+
+// Slowly break the motor, this prevents sudden breaking
+void SetMotorReverseIdle()
+{
+    // Serial.println("Motor idling");
+    //ForwardSpeed = lim_max(0, (ForwardSpeed-Deccleration));
+    Motor1_ReverseSpeed = lim_max(0, (Motor1_ReverseSpeed-Deccleration));
+    Motor2_ReverseSpeed = lim_max(0, (Motor2_ReverseSpeed-Deccleration));
+
+   // analogWrite(MOTOR1_PWM_CW, ForwardSpeed);
+   // analogWrite(MOTOR2_PWM_CCW, ForwardSpeed);   
+    analogWrite(MOTOR2_PWM_CW, Motor2_ReverseSpeed);
+    analogWrite(MOTOR1_PWM_CCW, Motor1_ReverseSpeed);
 }
 
 // Turn steering motor either right or left
 bool SetMotorTurning(turnCmd turn)
 {
+    int count = 10;
     switch(turn)
     {
-      LeftCmd:
+      case LeftCmd:
+        if(!leftAllow)
+        {
+          return false;
+        }
+          Serial.println("Motor Turning LEFT");
           // Rotate the stepper motor once Left
+          Left_Turn = lim_min(MaxSpeed, Left_Turn+Accleration);
+          Right_Turn = lim_max(0, Right_Turn-Deccleration);
+
+          analogWrite(STEERING_MOTOR_CW, Right_Turn);
+          analogWrite(STEERING_MOTOR_CCW, Left_Turn);
           return true;
-      RightCmd:
+      case RightCmd:
+        if(!rightAllow)
+        {
+          return false;
+        }
+          Serial.println("Motor Turning RIGHT");
           // Rotate the stepper motor once Right
+          Right_Turn = lim_min(MaxSpeed, Right_Turn+Accleration);
+          Left_Turn = lim_max(0, Left_Turn-Deccleration);
+
+          analogWrite(STEERING_MOTOR_CW, Right_Turn);
+          analogWrite(STEERING_MOTOR_CCW, Left_Turn);
           return true;
       default:
           // Garbage data, do nothing
+          Serial.print("Garbage: ");
+          Serial.println(turn);
+          Left_Turn = lim_max(0, (Left_Turn-Deccleration));
+          Right_Turn = lim_max(0, (Right_Turn-Deccleration));
+          analogWrite(STEERING_MOTOR_CW, Right_Turn);
+          analogWrite(STEERING_MOTOR_CCW, Left_Turn);
           return false;
     }
 }
