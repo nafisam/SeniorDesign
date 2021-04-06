@@ -67,12 +67,6 @@ void setup() {
     pinMode(SENSOR1_TRIG, OUTPUT);
     pinMode(SENSOR2_ECHO, INPUT);
     pinMode(SENSOR2_TRIG, OUTPUT);
-    pinMode(SENSOR3_ECHO, INPUT);
-    pinMode(SENSOR3_TRIG, OUTPUT);
-    pinMode(SENSOR4_ECHO, INPUT);
-    pinMode(SENSOR4_TRIG, OUTPUT);
-    pinMode(SENSOR5_ECHO, INPUT);
-    pinMode(SENSOR5_TRIG, OUTPUT);
     
     //Setup the button;
     pinMode(BUTTON, OUTPUT); // Generally, in push-button we take INPUT as a parameter but here we take OUTPUT because ANALOG PIN 
@@ -83,10 +77,11 @@ void setup() {
     //When it comes to the bluetooth this is going to be the biggest hickup
     //Depending on the module that is used this can be any baud rate
     //This was the baud rate for my Module, but their's might be 9600
-    bluetoothModule.begin(9600);
+    bluetoothModule.begin(115200);
 }
 
 void loop() {
+
     // If the car is disabled, check for input from bluetooth and loop again
     if(!car_enabled)
     {
@@ -97,9 +92,15 @@ void loop() {
         return;
     }
     //Check sensors, if we are approaching a wall stop
-    LeftSensor = SensorsDetectWall(SENSOR2_TRIG, SENSOR2_ECHO);
-    CenterSensor = SensorsDetectWall(SENSOR0_TRIG, SENSOR0_ECHO);
-    RightSensor = SensorsDetectWall(SENSOR1_TRIG, SENSOR1_ECHO);
+    LeftSensor = SensorsDetectWall(SENSOR1_TRIG, SENSOR1_ECHO);
+    Serial.println("This is left distance:");
+    Serial.print(LeftSensor);
+    CenterSensor = SensorsDetectWall(SENSOR2_TRIG, SENSOR2_ECHO);
+    Serial.println("This is center distance:");
+    Serial.print(CenterSensor);
+    RightSensor = SensorsDetectWall(SENSOR0_TRIG, SENSOR0_ECHO);
+    Serial.println("This is right distance:");
+    Serial.print(RightSensor);
    // bool RightSensorTurn = SensorsTurn(SENSOR2_TRIG, SENSOR2_ECHO);
   //  bool LeftSensorTurn = SensorsTurn(SENSOR0_TRIG, SENSOR0_ECHO);
 
@@ -128,18 +129,19 @@ void loop() {
       {
         if (parentData == Right)
         {
-        forwardAllow = true;
-        rightAllow = true;
-        Serial.println("Let's move right");
+          forwardAllow = true;
+          rightAllow = true;
+          Serial.println("Let's move right");
+        }
       }
 
       if((!leftAllow) && (!rightAllow))
       {
           SetMotorForwardIdle();
       }
-    } //end sensor if
+    }//end sensor if
 
-
+    Serial.println("we are passing the center if statement");
     // Attempt to read in values from bluetooth
     // If we get nothing from bluetooth use the joystick/button as input
     if( !BluetoothControls() )
@@ -151,7 +153,6 @@ void loop() {
     
     // Let everything breath for a moment
     delayMicroseconds(50);
-}
 }
 
 
@@ -171,7 +172,7 @@ bool SensorsDetectWall(int trigPin, int echoPin)
     Serial.println(sensorDistance);
     if (sensorDistance < DISTANCE)
     {
-      if(sensorDistance == 0){
+      if(sensorDistance < 0.01){
         return false;
       }
       else{
@@ -267,7 +268,8 @@ void ReadJoystick()
     else if(Joystick_yPos < JOYSTICK_LOW_THRES)
         SetMotorReverseSpeed(reverseAllow);
     else
-        changedForward = true;
+        SetMotorIdle();
+
 
     // Turning 
     if(Joystick_xPos < JOYSTICK_TURN_LEFT)
@@ -279,11 +281,8 @@ void ReadJoystick()
         SetMotorTurning(RightCmd);
     }
     else
-      changedReverse = true;
-
-    if(changedForward && changedReverse)
     {
-      SetMotorIdle();;
+        SetMotorTurning(IdleCmd);
     }
 }
 
@@ -311,6 +310,7 @@ int ReadJoystickTurn()
 //read button
 void ReadButton()
 {
+  Serial.println("entering button function");
     if(digitalRead(BUTTON) == LOW)  // If button pressed
     {
       SetMotorForwardSpeed(forwardAllow);
@@ -318,6 +318,7 @@ void ReadButton()
     else
     {
         SetMotorIdle();
+        SetMotorTurning(IdleCmd);
     }
 }
 
