@@ -9,14 +9,16 @@
 // Analog Pins
 #define JOYSTICK_XPOS       A0
 #define JOYSTICK_YPOS       A1
+#define BUTTON              A0
 
 // PWM pins
 #define MOTOR1_PWM_CW       2
 #define MOTOR1_PWM_CCW      3
 #define MOTOR2_PWM_CW       4
 #define MOTOR2_PWM_CCW      5
-#define STEPPER_PWM_CW      6
-#define STEPPER_PWM_CCW     7
+#define STEERING_MOTOR_CW   6
+#define STEERING_MOTOR_CCW  7
+
 
 // Sensor pins
 #define SENSOR0_ECHO        30
@@ -37,13 +39,19 @@
 
 // Joystick Threshold values
 // These are the thresholds the joystick has to be moved beyond
-#define JOYSTICK_HIGH_THRES 550
-#define JOYSTICK_LOW_THRES  480
-#define JOYSTICK_TURN_LEFT 250
-#define JOYSTICK_TURN_RIGHT 850
+#define JOYSTICK_HIGH_THRES 700
+#define JOYSTICK_LOW_THRES  300
+#define JOYSTICK_TURN_LEFT  120
+#define JOYSTICK_TURN_RIGHT 1000
 
-// How long we should not read joystick after we got a bluetooth command
-#define BLUETOOTH_HOLD_TIME 50
+// Turning limit for the wheels, because the motor will sheer them off
+#define TURN_LIMIT          40
+
+//stopping distance
+#define DISTANCE            50
+
+//car length
+#define CAR_LENGTH          150
 
 // Bluetooth commands that we can recieve
 typedef enum {
@@ -56,13 +64,13 @@ typedef enum {
 } bluetoothCmd;
 
 typedef enum {
-    LeftCmd,
-    RightCmd,
+    LeftCmd=0,
+    RightCmd=1,
 } turnCmd;
 
 // Vairables for the car
-int Accleration = 4;
+int Accleration = 2;
 int Deccleration = 2*Accleration;
 int BreakingPower = 2*Deccleration;
-int Distance = 100;
-int MaxSpeed = 200;
+int Distance = 35;
+int MaxSpeed = 255;
