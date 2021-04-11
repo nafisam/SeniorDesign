@@ -9,33 +9,23 @@
 // Analog Pins
 #define JOYSTICK_XPOS       A0
 #define JOYSTICK_YPOS       A1
-#define BUTTON              A0
 
 // PWM pins
 #define MOTOR1_PWM_CW       2
 #define MOTOR1_PWM_CCW      3
 #define MOTOR2_PWM_CW       4
 #define MOTOR2_PWM_CCW      5
-#define STEERING_MOTOR_CW   9
-#define STEERING_MOTOR_CCW  8
-
 
 // Sensor pins
 #define SENSOR0_ECHO        30
 #define SENSOR0_TRIG        31
-#define SENSOR1_ECHO        34
-#define SENSOR1_TRIG        35
-#define SENSOR2_ECHO        36
-#define SENSOR2_TRIG        37
-// #define SENSOR3_ECHO        36
-// #define SENSOR3_TRIG        37
-// #define SENSOR4_ECHO        38
-// #define SENSOR4_TRIG        39
-// #define SENSOR5_ECHO        40
-// #define SENSOR5_TRIG        41
+#define SENSOR1_ECHO        32
+#define SENSOR1_TRIG        33
+#define SENSOR2_ECHO        34
+#define SENSOR2_TRIG        35
+#define SENSOR3_ECHO        36
+#define SENSOR3_TRIG        37
 
-// Push Button Pins
-#define BUTTON A0
 
 // Joystick Threshold values
 // These are the thresholds the joystick has to be moved beyond
@@ -48,7 +38,7 @@
 #define TURN_LIMIT          40
 
 //stopping distance
-#define DISTANCE            50
+#define DISTANCE            60
 
 //car length
 #define CAR_LENGTH          150
@@ -66,11 +56,10 @@ typedef enum {
 typedef enum {
     LeftCmd=0,
     RightCmd=1,
-    IdleCmd=2
 } turnCmd;
 
 // Vairables for the car
-int Accleration = 4;
+int Accleration = 2;
 int Deccleration = 2*Accleration;
 int BreakingPower = 2*Deccleration;
 int Distance = 35;
