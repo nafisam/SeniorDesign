@@ -16,8 +16,8 @@
 #define MOTOR1_PWM_CCW      3
 #define MOTOR2_PWM_CW       4
 #define MOTOR2_PWM_CCW      5
-#define STEERING_MOTOR_CW   6
-#define STEERING_MOTOR_CCW  7
+#define STEERING_MOTOR_CW   8
+#define STEERING_MOTOR_CCW  9
 
 
 // Sensor pins
@@ -27,12 +27,7 @@
 #define SENSOR1_TRIG        33
 #define SENSOR2_ECHO        34
 #define SENSOR2_TRIG        35
-#define SENSOR3_ECHO        36
-#define SENSOR3_TRIG        37
-#define SENSOR4_ECHO        38
-#define SENSOR4_TRIG        39
-#define SENSOR5_ECHO        40
-#define SENSOR5_TRIG        41
+
 
 // Push Button Pins
 #define BUTTON A0
@@ -66,11 +61,13 @@ typedef enum {
 typedef enum {
     LeftCmd=0,
     RightCmd=1,
+    IdleCmd=2,
 } turnCmd;
 
 // Vairables for the car
 int Accleration = 2;
-int Deccleration = 2*Accleration;
-int BreakingPower = 2*Deccleration;
+int TurningAccel = 8*Accleration;
+int Deccleration = 4*Accleration;
+int BreakingPower = 18*Deccleration;
 int Distance = 35;
-int MaxSpeed = 255;
+int MaxSpeed = 200;
